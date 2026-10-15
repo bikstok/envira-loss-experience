@@ -1,57 +1,16 @@
-"""Core domain models, data ingestion, and loss experience calculation logic."""
+"""Core domain models and SQLite-backed loss experience repository."""
 
-import csv
-import os
+import sqlite3
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Dict, List, Optional
+
+from src.db import init_db, load_csv_data_to_sqlite, parse_date_to_iso
 
 
 def parse_date(date_str: str) -> datetime:
-    """Parse dates supporting both ISO (YYYY-MM-DD) and European (DD-MM-YYYY) formats."""
-    clean_str = date_str.strip()
-    for fmt in ("%Y-%m-%d", "%d-%m-%Y"):
-        try:
-            return datetime.strptime(clean_str, fmt)
-        except ValueError:
-            continue
-    raise ValueError(f"Unsupported date format: {date_str}")
-
-
-@dataclass(frozen=True)
-class Asset:
-    asset_id: str
-    portfolio_id: str
-    region: str
-    asset_type: str
-    construction_year: int
-    sum_insured_dkk: float
-
-
-@dataclass(frozen=True)
-class Policy:
-    policy_id: str
-    asset_id: str
-    peril: str
-    inception_date: datetime
-    expiry_date: datetime
-    annual_premium: float
-    currency: str
-    underwriting_year: int
-    earned_premium_dkk: float
-
-
-@dataclass(frozen=True)
-class Claim:
-    claim_id: str
-    policy_id: str
-    loss_date: datetime
-    reported_date: datetime
-    paid_amount: float
-    reserve_amount: float
-    currency: str
-    status: str
-    incurred_loss_dkk: float
+    """Parse date string to datetime object."""
+    return datetime.strptime(parse_date_to_iso(date_str), "%Y-%m-%d")
 
 
 @dataclass
@@ -135,162 +94,25 @@ class DataQualityReport:
 
 
 class LossExperienceRepository:
-    """In-memory loaded data repository and analytics engine."""
+    """SQLite-backed repository and analytics engine."""
 
-    def __init__(self, data_dir: str):
+    def __init__(self, data_dir: str, db_path: str = ":memory:"):
         self.data_dir = data_dir
-        self.assets: Dict[str, Asset] = {}
-        self.policies: Dict[str, Policy] = {}
-        self.claims: List[Claim] = []
-        self.fx_rates: Dict[Tuple[str, str], float] = {}
+        self.conn = sqlite3.connect(db_path, check_same_thread=False)
+        self.conn.row_factory = sqlite3.Row
+        init_db(self.conn)
+        load_csv_data_to_sqlite(self.conn, self.data_dir)
 
-        # Quality metrics tracking
-        self.orphaned_claims_excluded = 0
-        self.claims_loss_before_inception = 0
-        self.negative_paid_claims = 0
-        self.non_standard_perils_fixed = 0
-        self.european_dates_parsed = 0
-
-        self._load_data()
-
-    def _get_fx_rate(self, dt: datetime, currency: str) -> float:
-        if currency == "DKK":
-            return 1.0
-        month_key = dt.strftime("%Y-%m")
-        rate = self.fx_rates.get((month_key, currency))
-        if rate is None:
-            raise KeyError(f"Missing FX rate for month {month_key} and currency {currency}")
-        return rate
-
-    def _load_data(self):
-        # 1. Load FX Rates
-        fx_path = os.path.join(self.data_dir, "fx_rates.csv")
-        with open(fx_path, newline="", encoding="utf-8") as f:
-            reader = csv.DictReader(f)
-            for row in reader:
-                month = row["month"].strip()
-                curr = row["currency"].strip()
-                rate = float(row["rate_dkk_per_unit"])
-                self.fx_rates[(month, curr)] = rate
-
-        # 2. Load Assets
-        assets_path = os.path.join(self.data_dir, "assets.csv")
-        with open(assets_path, newline="", encoding="utf-8") as f:
-            reader = csv.DictReader(f)
-            for row in reader:
-                asset = Asset(
-                    asset_id=row["asset_id"].strip(),
-                    portfolio_id=row["portfolio_id"].strip(),
-                    region=row["region"].strip(),
-                    asset_type=row["asset_type"].strip(),
-                    construction_year=int(row["construction_year"]),
-                    sum_insured_dkk=float(row["sum_insured_dkk"]),
-                )
-                self.assets[asset.asset_id] = asset
-
-        # 3. Load Policies
-        policies_path = os.path.join(self.data_dir, "policies.csv")
-        with open(policies_path, newline="", encoding="utf-8") as f:
-            reader = csv.DictReader(f)
-            for row in reader:
-                raw_peril = row["peril"]
-                normalized_peril = raw_peril.strip().lower()
-                if raw_peril != normalized_peril:
-                    self.non_standard_perils_fixed += 1
-
-                inc_raw = row["inception_date"].strip()
-                if "-" in inc_raw and inc_raw[2] == "-":
-                    self.european_dates_parsed += 1
-                inception = parse_date(inc_raw)
-
-                exp_raw = row["expiry_date"].strip()
-                if "-" in exp_raw and exp_raw[2] == "-":
-                    self.european_dates_parsed += 1
-                expiry = parse_date(exp_raw)
-
-                curr = row["currency"].strip()
-                annual_prem = float(row["annual_premium"])
-                fx_rate = self._get_fx_rate(inception, curr)
-                earned_prem_dkk = annual_prem * fx_rate
-
-                policy = Policy(
-                    policy_id=row["policy_id"].strip(),
-                    asset_id=row["asset_id"].strip(),
-                    peril=normalized_peril,
-                    inception_date=inception,
-                    expiry_date=expiry,
-                    annual_premium=annual_prem,
-                    currency=curr,
-                    underwriting_year=inception.year,
-                    earned_premium_dkk=earned_prem_dkk,
-                )
-                self.policies[policy.policy_id] = policy
-
-        # 4. Load Claims
-        claims_path = os.path.join(self.data_dir, "claims.csv")
-        with open(claims_path, newline="", encoding="utf-8") as f:
-            reader = csv.DictReader(f)
-            for row in reader:
-                pol_id = row["policy_id"].strip()
-                if pol_id not in self.policies:
-                    # Orphaned claim: cannot link to any asset, peril or portfolio
-                    self.orphaned_claims_excluded += 1
-                    continue
-
-                policy = self.policies[pol_id]
-
-                loss_raw = row["loss_date"].strip()
-                if "-" in loss_raw and loss_raw[2] == "-":
-                    self.european_dates_parsed += 1
-                loss_date = parse_date(loss_raw)
-
-                rep_raw = row["reported_date"].strip()
-                if "-" in rep_raw and rep_raw[2] == "-":
-                    self.european_dates_parsed += 1
-                reported_date = parse_date(rep_raw)
-
-                if loss_date < policy.inception_date:
-                    self.claims_loss_before_inception += 1
-
-                paid = float(row["paid_amount"])
-                res = float(row["reserve_amount"])
-                if paid < 0 or res < 0:
-                    self.negative_paid_claims += 1
-
-                curr = row["currency"].strip()
-                status = row["status"].strip().lower()
-
-                # Incurred loss calculation per brief definitions:
-                # - withdrawn / declined: 0.0
-                # - settled: paid_amount
-                # - open: paid_amount + reserve_amount
-                if status in ("withdrawn", "declined"):
-                    incurred_orig = 0.0
-                elif status == "settled":
-                    incurred_orig = paid
-                elif status == "open":
-                    incurred_orig = paid + res
-                else:
-                    incurred_orig = paid + res
-
-                fx_rate = self._get_fx_rate(loss_date, curr)
-                incurred_dkk = incurred_orig * fx_rate
-
-                claim = Claim(
-                    claim_id=row["claim_id"].strip(),
-                    policy_id=pol_id,
-                    loss_date=loss_date,
-                    reported_date=reported_date,
-                    paid_amount=paid,
-                    reserve_amount=res,
-                    currency=curr,
-                    status=status,
-                    incurred_loss_dkk=incurred_dkk,
-                )
-                self.claims.append(claim)
+    @property
+    def total_policies_count(self) -> int:
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT COUNT(*) FROM policies")
+        return cursor.fetchone()[0]
 
     def get_portfolio_ids(self) -> List[str]:
-        return sorted({a.portfolio_id for a in self.assets.values()})
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT DISTINCT portfolio_id FROM assets ORDER BY portfolio_id")
+        return [row[0] for row in cursor.fetchall()]
 
     def get_portfolio_experience(
         self,
@@ -299,71 +121,93 @@ class LossExperienceRepository:
         region: Optional[str] = None,
         asset_type: Optional[str] = None,
     ) -> Optional[PortfolioExperience]:
-        """Compute loss experience by peril and overall for a portfolio."""
-        # Check if portfolio exists
-        portfolio_exists = any(a.portfolio_id == portfolio_id for a in self.assets.values())
-        if not portfolio_exists:
+        """Compute loss experience by peril and overall using parameterized SQL queries."""
+        cursor = self.conn.cursor()
+
+        # Check portfolio existence
+        cursor.execute("SELECT 1 FROM assets WHERE portfolio_id = ? LIMIT 1", (portfolio_id,))
+        if not cursor.fetchone():
             return None
 
-        # Filter policies belonging to this portfolio
-        matching_policies: Dict[str, Policy] = {}
-        for pol_id, policy in self.policies.items():
-            asset = self.assets[policy.asset_id]
-            if asset.portfolio_id != portfolio_id:
-                continue
-            if underwriting_year is not None and policy.underwriting_year != underwriting_year:
-                continue
-            if region is not None and asset.region != region:
-                continue
-            if asset_type is not None and asset.asset_type != asset_type:
-                continue
-            matching_policies[pol_id] = policy
+        # Build dynamic filter conditions
+        where_clauses = ["a.portfolio_id = ?"]
+        params = [portfolio_id]
 
-        # Find matching claims belonging to these policies
-        matching_claims = [c for c in self.claims if c.policy_id in matching_policies]
+        if underwriting_year is not None:
+            where_clauses.append("p.underwriting_year = ?")
+            params.append(underwriting_year)
+        if region is not None:
+            where_clauses.append("a.region = ?")
+            params.append(region)
+        if asset_type is not None:
+            where_clauses.append("a.asset_type = ?")
+            params.append(asset_type)
 
-        # Group by peril
-        perils: Dict[str, PerilExperience] = {}
-        # Ensure all standard perils are present in the response
+        where_sql = " AND ".join(where_clauses)
+
+        # 1. Query policy counts and earned premium per peril
+        sql_policies = f"""
+            SELECT
+                p.peril,
+                COUNT(p.policy_id) AS policy_count,
+                COALESCE(SUM(p.earned_premium_dkk), 0.0) AS earned_premium
+            FROM policies p
+            JOIN assets a ON p.asset_id = a.asset_id
+            WHERE {where_sql}
+            GROUP BY p.peril;
+        """
+        cursor.execute(sql_policies, params)
+        policy_rows = {row["peril"]: (row["policy_count"], row["earned_premium"]) for row in cursor.fetchall()}
+
+        # 2. Query claim counts, incurred losses, and largest claim per peril
+        sql_claims = f"""
+            SELECT
+                p.peril,
+                COUNT(c.claim_id) AS claim_count,
+                COALESCE(SUM(c.incurred_loss_dkk), 0.0) AS incurred_loss,
+                COALESCE(MAX(c.incurred_loss_dkk), 0.0) AS largest_single_claim
+            FROM claims c
+            JOIN policies p ON c.policy_id = p.policy_id
+            JOIN assets a ON p.asset_id = a.asset_id
+            WHERE {where_sql}
+            GROUP BY p.peril;
+        """
+        cursor.execute(sql_claims, params)
+        claim_rows = {
+            row["peril"]: (
+                row["claim_count"],
+                row["incurred_loss"],
+                row["largest_single_claim"],
+            )
+            for row in cursor.fetchall()
+        }
+
+        # Ensure all standard perils exist in the output
         standard_perils = {"fire", "flood", "hail", "storm", "subsidence"}
-        for peril in standard_perils:
-            perils[peril] = PerilExperience(peril=peril)
+        all_perils = standard_perils | set(policy_rows.keys()) | set(claim_rows.keys())
 
-        # Aggregate policies
-        for policy in matching_policies.values():
-            if policy.peril not in perils:
-                perils[policy.peril] = PerilExperience(peril=policy.peril)
-            exp = perils[policy.peril]
-            exp.policy_count += 1
-            exp.earned_premium += policy.earned_premium_dkk
+        perils: Dict[str, PerilExperience] = {}
+        for peril in all_perils:
+            pol_count, prem = policy_rows.get(peril, (0, 0.0))
+            clm_count, loss, max_claim = claim_rows.get(peril, (0, 0.0, 0.0))
+            loss_ratio = (loss / prem) if prem > 0 else 0.0
+            perils[peril] = PerilExperience(
+                peril=peril,
+                policy_count=pol_count,
+                earned_premium=prem,
+                incurred_loss=loss,
+                loss_ratio=loss_ratio,
+                claim_count=clm_count,
+                largest_single_claim=max(0.0, max_claim),
+            )
 
-        # Aggregate claims
-        for claim in matching_claims:
-            policy = matching_policies[claim.policy_id]
-            exp = perils[policy.peril]
-            exp.claim_count += 1
-            exp.incurred_loss += claim.incurred_loss_dkk
-            if claim.incurred_loss_dkk > exp.largest_single_claim:
-                exp.largest_single_claim = claim.incurred_loss_dkk
-
-        # Calculate loss ratios and totals
         total_policy_count = sum(p.policy_count for p in perils.values())
         total_earned_premium = sum(p.earned_premium for p in perils.values())
         total_incurred_loss = sum(p.incurred_loss for p in perils.values())
         total_claim_count = sum(p.claim_count for p in perils.values())
-        largest_single_claim = max(
-            [c.incurred_loss_dkk for c in matching_claims],
-            default=0.0,
-        )
-
-        for exp in perils.values():
-            if exp.earned_premium > 0:
-                exp.loss_ratio = exp.incurred_loss / exp.earned_premium
-            else:
-                exp.loss_ratio = 0.0
-
+        largest_single_claim = max([p.largest_single_claim for p in perils.values()], default=0.0)
         overall_loss_ratio = (
-            total_incurred_loss / total_earned_premium if total_earned_premium > 0 else 0.0
+            (total_incurred_loss / total_earned_premium) if total_earned_premium > 0 else 0.0
         )
 
         return PortfolioExperience(
@@ -374,7 +218,7 @@ class LossExperienceRepository:
             total_incurred_loss=total_incurred_loss,
             overall_loss_ratio=overall_loss_ratio,
             total_claim_count=total_claim_count,
-            largest_single_claim=max(0.0, largest_single_claim),
+            largest_single_claim=largest_single_claim,
         )
 
     def get_all_portfolios_experience(
@@ -414,22 +258,39 @@ class LossExperienceRepository:
         return portfolios
 
     def get_data_quality_report(self) -> DataQualityReport:
-        fx_count = len(self.fx_rates)
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT COUNT(*) FROM assets")
+        total_assets = cursor.fetchone()[0]
+
+        cursor.execute("SELECT COUNT(*) FROM policies")
+        total_policies = cursor.fetchone()[0]
+
+        cursor.execute("SELECT COUNT(*) FROM claims")
+        loaded_claims = cursor.fetchone()[0]
+
+        cursor.execute("SELECT COUNT(*) FROM fx_rates")
+        total_fx = cursor.fetchone()[0]
+
+        cursor.execute("SELECT metric_key, metric_value FROM data_quality_metrics")
+        metrics = dict(cursor.fetchall())
+
+        orphaned = metrics.get("orphaned_claims_excluded", 0)
+
         return DataQualityReport(
-            total_assets=len(self.assets),
-            total_policies=len(self.policies),
-            total_claims=len(self.claims) + self.orphaned_claims_excluded,
-            total_fx_rates=fx_count,
-            orphaned_claims_excluded=self.orphaned_claims_excluded,
-            claims_loss_before_inception=self.claims_loss_before_inception,
-            negative_paid_claims=self.negative_paid_claims,
-            non_standard_peril_casing_fixed=self.non_standard_perils_fixed,
-            european_date_formats_parsed=self.european_dates_parsed,
+            total_assets=total_assets,
+            total_policies=total_policies,
+            total_claims=loaded_claims + orphaned,
+            total_fx_rates=total_fx,
+            orphaned_claims_excluded=orphaned,
+            claims_loss_before_inception=metrics.get("claims_loss_before_inception_retained", 0),
+            negative_paid_claims=metrics.get("negative_paid_claims_retained", 0),
+            non_standard_peril_casing_fixed=metrics.get("non_standard_perils_normalized", 0),
+            european_date_formats_parsed=metrics.get("european_dates_parsed", 0),
             known_portfolios=self.get_portfolio_ids(),
             assumptions_summary=[
                 "Orphaned claims (260 rows referencing non-existent policy_ids) were excluded from portfolio calculations because they cannot be attributed to any portfolio or peril.",
                 "Non-standard peril values (mixed case, leading/trailing whitespace) were normalized to standard lowercase perils (fire, flood, hail, storm, subsidence).",
-                "European date formats (DD-MM-YYYY) in claims and policies were parsed alongside ISO format (YYYY-MM-DD).",
+                "European date formats (DD-MM-YYYY) in claims and policies were parsed into standard ISO format (YYYY-MM-DD).",
                 "Claims with loss dates occurring prior to policy inception (310 rows) were retained under their assigned policy_id per the brief definition ('A claim belongs to a policy').",
                 "Negative paid amounts (262 settled claims) were treated as negative incurred loss (representing subrogation/salvage recoveries), consistent with insurance accounting.",
                 "FX conversion uses the month of policy inception for earned premium, and the month of loss date for claim incurred losses.",

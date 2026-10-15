@@ -1,15 +1,16 @@
 Started: 2026-10-15 14:10 CEST
-Stopped: 2026-10-15 14:20 CEST
+Stopped: 2026-10-15 14:32 CEST
 
 - **What I built**
   - Core loss experience engine: `GET /portfolios/{portfolio_id}/loss-experience` returning peril breakdowns (policy count, earned premium, incurred loss, loss ratio, claim count, largest claim) in DKK.
+  - SQLite relational backend (Item 8): normalized tables (`assets`, `policies`, `claims`, `fx_rates`), relational indexes, and parameterized SQL queries for aggregation and filtering.
   - Portfolio comparison endpoint (`GET /portfolios/loss-experience`) with configurable rankings, plus filtering by underwriting year, region, and asset type.
-  - Data quality audit endpoint (`GET /data-quality`) and a self-contained interactive web dashboard (`GET /`) for non-technical underwriters.
+  - Data quality audit endpoint (`GET /data-quality`) and an interactive web dashboard (`GET /`) for non-technical underwriters.
   - Ingestion pipeline normalizing 1,321 dirty peril strings (`.strip().lower()`), parsing European and ISO date formats, and applying monthly FX rates.
   - Full Docker and Compose configuration with automated healthcheck and pytest suite.
 
 - **What I deliberately did not build, and why**
-  - External database (Postgres/SQLite disk file) and caching layers: With ~15,000 total rows, in-memory ingestion takes <100ms at startup. Introducing DB machinery would add unnecessary operational surface area.
+  - External database service (Postgres container / Kafka / Celery): Python's standard library `sqlite3` satisfies the database requirement with zero network latency, zero container sprawl, and instant boot times.
   - React/npm build pipeline: Kept the UI zero-dependency (native HTML5/vanilla JS served directly from FastAPI) for immediate runnability without node_modules bloat.
   - Excluded 260 orphaned claims lacking valid policy IDs, cataloging them transparently in the quality report rather than guessing associations.
 

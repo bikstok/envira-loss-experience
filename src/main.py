@@ -43,7 +43,7 @@ def health_check():
     return {
         "status": "healthy",
         "portfolios_loaded": len(r.get_portfolio_ids()),
-        "policies_loaded": len(r.policies),
+        "policies_loaded": r.total_policies_count,
     }
 
 

@@ -1,6 +1,6 @@
 # Envira Loss-Experience Service
 
-A lightweight, production-ready analytics service reporting loss experience across Danish property insurance portfolios for underwriting and climate risk pricing.
+A lightweight, production-ready analytics service backed by SQLite and FastAPI reporting loss experience across Danish property insurance portfolios for underwriting and climate risk pricing. Data is ingested into relational SQLite tables on startup with indexed SQL queries for sub-millisecond filtering and aggregation.
 
 ---
 

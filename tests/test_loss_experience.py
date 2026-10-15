@@ -45,12 +45,28 @@ def test_repository_loading():
         pytest.skip("Data directory not present")
 
     repo = LossExperienceRepository(data_dir)
-    assert len(repo.assets) == 4200
-    assert len(repo.policies) == 11560
-    assert repo.orphaned_claims_excluded == 260
-    assert repo.claims_loss_before_inception == 310
-    assert repo.negative_paid_claims == 262
+    dq = repo.get_data_quality_report()
+    assert dq.total_assets == 4200
+    assert dq.total_policies == 11560
+    assert dq.orphaned_claims_excluded == 260
+    assert dq.claims_loss_before_inception == 310
+    assert dq.negative_paid_claims == 262
     assert len(repo.get_portfolio_ids()) == 12
+    assert repo.total_policies_count == 11560
+
+
+def test_sqlite_direct_query():
+    data_dir = os.getenv("DATA_DIR", "data")
+    if not os.path.exists(data_dir):
+        pytest.skip("Data directory not present")
+
+    repo = LossExperienceRepository(data_dir)
+    cursor = repo.conn.cursor()
+    cursor.execute("SELECT COUNT(*) FROM assets")
+    assert cursor.fetchone()[0] == 4200
+    cursor.execute("SELECT COUNT(*) FROM claims")
+    assert cursor.fetchone()[0] == 4249
+
 
 
 def test_portfolio_experience_calculation():
