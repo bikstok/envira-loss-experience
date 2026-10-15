@@ -1,0 +1,15 @@
+# Data files must not be committed per BRIEF.md
+data/
+
+# Python & testing cache files
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# Environment files
+.env
+
+# OS / Editor artifacts
+.DS_Store
+*.swp
