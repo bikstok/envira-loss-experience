@@ -1,0 +1,22 @@
+Started: 2026-10-15 14:10 CEST
+Stopped: 2026-10-15 14:32 CEST
+
+- **What I built**
+  - Core loss experience engine: `GET /portfolios/{portfolio_id}/loss-experience` returning peril breakdowns (policy count, earned premium, incurred loss, loss ratio, claim count, largest claim) in DKK.
+  - SQLite relational backend (Item 8): normalized tables (`assets`, `policies`, `claims`, `fx_rates`), relational indexes, and parameterized SQL queries for aggregation and filtering.
+  - Portfolio comparison endpoint (`GET /portfolios/loss-experience`) with configurable rankings, plus filtering by underwriting year, region, and asset type.
+  - Data quality audit endpoint (`GET /data-quality`) and an interactive web dashboard (`GET /`) for non-technical underwriters.
+  - Ingestion pipeline normalizing 1,321 dirty peril strings (`.strip().lower()`), parsing European and ISO date formats, and applying monthly FX rates.
+  - Independent reconciliation script (`scripts/verify.py`): decoupled verification script independently computing raw totals and verifying 0.00 DKK discrepancy across all 12 portfolios and 60 peril segments.
+  - Full Docker and Compose configuration with automated healthcheck and pytest suite.
+
+- **What I deliberately did not build, and why**
+  - External database service (Postgres container / Kafka / Celery): Python's standard library `sqlite3` satisfies the database requirement with zero network latency, zero container sprawl, and instant boot times.
+  - React/npm build pipeline: Kept the UI zero-dependency (native HTML5/vanilla JS served directly from FastAPI) for immediate runnability without node_modules bloat.
+  - Excluded 260 orphaned claims lacking valid policy IDs, cataloging them transparently in the quality report rather than guessing associations.
+
+- **What I would do first with another day**
+  - Implement automated re-attribution for the 83 claims that occurred before policy inception but match an earlier active policy term for the same asset and peril.
+  - Add Parquet/CSV export endpoints and historical development triangulations for actuary reporting.
+
+*(AI tool note: Used Gemini/Claude CLI agent. Verified and rejected naive string slicing for FX lookups after discovering European date formats (`DD-MM-YYYY`), replacing it with explicit multi-format date parsing which resolved 572 date/FX mismatch errors.)*

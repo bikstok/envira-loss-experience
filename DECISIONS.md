@@ -7,6 +7,7 @@ Stopped: 2026-10-15 14:32 CEST
   - Portfolio comparison endpoint (`GET /portfolios/loss-experience`) with configurable rankings, plus filtering by underwriting year, region, and asset type.
   - Data quality audit endpoint (`GET /data-quality`) and an interactive web dashboard (`GET /`) for non-technical underwriters.
   - Ingestion pipeline normalizing 1,321 dirty peril strings (`.strip().lower()`), parsing European and ISO date formats, and applying monthly FX rates.
+  - Independent reconciliation script (`scripts/verify.py`): decoupled verification script independently computing raw totals and verifying 0.00 DKK discrepancy across all 12 portfolios and 60 peril segments.
   - Full Docker and Compose configuration with automated healthcheck and pytest suite.
 
 - **What I deliberately did not build, and why**

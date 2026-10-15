@@ -15,6 +15,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy source code and test suite
 COPY src/ /app/src/
 COPY tests/ /app/tests/
+COPY scripts/ /app/scripts/
 
 EXPOSE 8000
 

@@ -41,11 +41,18 @@ docker compose down
 
 ---
 
-## 2. Running Automated Tests
+## 2. Running Automated Tests & Mathematical Verification
 
+### Run Automated Tests (pytest)
 Run the test suite inside the container environment with data mounted read-only:
 ```bash
 docker run --rm -v $(pwd)/data:/app/data:ro envira_test-loss-experience-api pytest -v
+```
+
+### Independent Underwriting Reconciliation Script
+Run the decoupled verification audit comparing raw CSV calculations directly against the SQLite service API down to the cent:
+```bash
+docker run --rm -v $(pwd)/data:/app/data:ro envira_test-loss-experience-api python scripts/verify.py
 ```
 
 ---
