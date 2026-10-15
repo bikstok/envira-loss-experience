@@ -1,5 +1,5 @@
 Started: 2026-10-15 14:10 CEST
-Stopped: 2026-10-15 15:07 CEST
+Stopped: 2026-10-15 16:10 CEST
 
 - **What I built**
   - Core loss experience engine: `GET /portfolios/{portfolio_id}/loss-experience` returning peril breakdowns (policy count, earned premium, incurred loss, loss ratio, claim count, largest claim) in DKK.
@@ -22,5 +22,6 @@ Stopped: 2026-10-15 15:07 CEST
 - **What I would do first with another day**
   - Implement automated re-attribution for the 83 claims that occurred before policy inception but match an earlier active policy term for the same asset and peril.
   - Add Parquet/CSV export endpoints and historical development triangulations for actuary reporting.
+  - Add CI/CD, linting, and formater.
 
 *(AI tool note: Used Gemini/Claude CLI agent. Verified and rejected naive string slicing for FX lookups after discovering European date formats (`DD-MM-YYYY`), replacing it with explicit multi-format date parsing which resolved 572 date/FX mismatch errors.)*
