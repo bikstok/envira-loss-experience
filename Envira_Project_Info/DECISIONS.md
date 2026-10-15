@@ -5,6 +5,7 @@ Stopped: 2026-10-15 14:32 CEST
   - Core loss experience engine: `GET /portfolios/{portfolio_id}/loss-experience` returning peril breakdowns (policy count, earned premium, incurred loss, loss ratio, claim count, largest claim) in DKK.
   - SQLite relational backend (Item 8): normalized tables (`assets`, `policies`, `claims`, `fx_rates`), relational indexes, and parameterized SQL queries for aggregation and filtering.
   - Portfolio comparison endpoint (`GET /portfolios/loss-experience`) with configurable rankings, plus filtering by underwriting year, region, and asset type.
+  - Strict query input validation: returning clear HTTP 400 Bad Request responses with allowable options for invalid sort metrics, orders, regions, asset types, or underwriting years.
   - Data quality audit endpoint (`GET /data-quality`) and an interactive web dashboard (`GET /`) for non-technical underwriters.
   - Ingestion pipeline normalizing 1,321 dirty peril strings (`.strip().lower()`), parsing European and ISO date formats, and applying monthly FX rates.
   - Independent reconciliation script (`scripts/verify.py`): decoupled verification script independently computing raw totals and verifying 0.00 DKK discrepancy across all 12 portfolios and 60 peril segments.

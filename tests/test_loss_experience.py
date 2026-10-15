@@ -126,11 +126,24 @@ def test_api_endpoints():
         res = client.get("/portfolios/PF-999/loss-experience")
         assert res.status_code == 404
 
-        # 4. Filtered portfolio
+        # 4. Filtered portfolio (valid)
         res = client.get("/portfolios/PF-01/loss-experience?underwriting_year=2023&region=Syddanmark")
         assert res.status_code == 200
 
-        # 5. Compare portfolios
+        # 4b. Filter validation (invalid inputs -> 400)
+        res_bad_year = client.get("/portfolios/PF-01/loss-experience?underwriting_year=1800")
+        assert res_bad_year.status_code == 400
+        assert "underwriting_year" in res_bad_year.json()["detail"]
+
+        res_bad_region = client.get("/portfolios/PF-01/loss-experience?region=Atlantis")
+        assert res_bad_region.status_code == 400
+        assert "region" in res_bad_region.json()["detail"]
+
+        res_bad_type = client.get("/portfolios/PF-01/loss-experience?asset_type=spaceship")
+        assert res_bad_type.status_code == 400
+        assert "asset_type" in res_bad_type.json()["detail"]
+
+        # 5. Compare portfolios (valid)
         res = client.get("/portfolios/loss-experience?sort_by=loss_ratio&order=desc")
         assert res.status_code == 200
         portfolios = res.json()["portfolios"]
@@ -138,6 +151,15 @@ def test_api_endpoints():
         # Verify descending order
         ratios = [p["overall_loss_ratio"] for p in portfolios]
         assert ratios == sorted(ratios, reverse=True)
+
+        # 5b. Compare portfolios validation (invalid inputs -> 400)
+        res_bad_sort = client.get("/portfolios/loss-experience?sort_by=random_column")
+        assert res_bad_sort.status_code == 400
+        assert "sort_by" in res_bad_sort.json()["detail"]
+
+        res_bad_order = client.get("/portfolios/loss-experience?order=backwards")
+        assert res_bad_order.status_code == 400
+        assert "order" in res_bad_order.json()["detail"]
 
         # 6. Data quality report
         res = client.get("/data-quality")

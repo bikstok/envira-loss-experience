@@ -47,6 +47,58 @@ def health_check():
     }
 
 
+VALID_SORT_FIELDS = {
+    "loss_ratio",
+    "incurred_loss",
+    "earned_premium",
+    "policy_count",
+    "claim_count",
+    "portfolio_id",
+}
+VALID_SORT_ORDERS = {"asc", "desc"}
+VALID_REGIONS = {"Hovedstaden", "Midtjylland", "Nordjylland", "Sjaelland", "Syddanmark"}
+VALID_ASSET_TYPES = {"agricultural", "commercial", "industrial", "public", "residential"}
+
+
+def validate_filters(
+    underwriting_year: Optional[int] = None,
+    region: Optional[str] = None,
+    asset_type: Optional[str] = None,
+):
+    if underwriting_year is not None:
+        if underwriting_year < 1900 or underwriting_year > 2100:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid underwriting_year '{underwriting_year}'. Must be between 1900 and 2100.",
+            )
+    if region is not None and region not in VALID_REGIONS:
+        valid_list = ", ".join(sorted(VALID_REGIONS))
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid region '{region}'. Allowed regions: {valid_list}",
+        )
+    if asset_type is not None and asset_type not in VALID_ASSET_TYPES:
+        valid_list = ", ".join(sorted(VALID_ASSET_TYPES))
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid asset_type '{asset_type}'. Allowed asset types: {valid_list}",
+        )
+
+
+def validate_sort_params(sort_by: str, order: str):
+    if sort_by not in VALID_SORT_FIELDS:
+        valid_list = ", ".join(sorted(VALID_SORT_FIELDS))
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid sort_by field '{sort_by}'. Allowed fields: {valid_list}",
+        )
+    if order.lower() not in VALID_SORT_ORDERS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid sort order '{order}'. Allowed orders: asc, desc",
+        )
+
+
 @app.get(
     "/portfolios/{portfolio_id}/loss-experience",
     tags=["Loss Experience"],
@@ -67,6 +119,7 @@ def get_portfolio_loss_experience(
     - claim_count
     - largest_single_claim (DKK)
     """
+    validate_filters(underwriting_year=underwriting_year, region=region, asset_type=asset_type)
     r = get_repo()
     exp = r.get_portfolio_experience(
         portfolio_id=portfolio_id,
@@ -99,6 +152,8 @@ def compare_portfolios(
     asset_type: Optional[str] = Query(None, description="Filter by asset type"),
 ):
     """Returns comparative summary of all portfolios with configurable ranking."""
+    validate_sort_params(sort_by, order)
+    validate_filters(underwriting_year=underwriting_year, region=region, asset_type=asset_type)
     r = get_repo()
     portfolios = r.get_all_portfolios_experience(
         sort_by=sort_by,
