@@ -7,7 +7,7 @@ A lightweight, production-ready analytics service backed by SQLite and FastAPI r
 ## 1. Quickstart
 
 ### Prerequisites
-- Docker & Docker Compose
+- Make, Docker & Docker Compose
 
 ### Data Placement
 Ensure the raw CSV data files are located in the `./data/` directory at the project root:
@@ -20,17 +20,35 @@ Ensure the raw CSV data files are located in the `./data/` directory at the proj
 ```
 *(Note: Per the assessment brief, `./data/` is excluded from git version control via `.gitignore`.)*
 
-### Service Control (Makefile / CLI Runner)
-Control the service and test runner with `make` or the bundled `./run` script:
+### Service Control (Makefile)
+The service and test suite are managed via the included `Makefile`:
 
-| Action | Makefile | Direct Script | Docker Compose Equivalent |
-|---|---|---|---|
-| **Start Service** | `make start` | `./run start` | `docker compose up --build -d` |
-| **Stop Service** | `make stop` | `./run stop` | `docker compose down` |
-| **Run Tests** | `make test` | `./run test` | `docker compose run --rm loss-experience-api pytest -v` |
-| **Check Status** | `make status` | `./run status` | `docker compose ps` |
-| **Stream Logs** | `make logs` | `./run logs` | `docker compose logs -f` |
-| **Clean Up** | `make clean` | `./run clean` | `docker compose down -v --remove-orphans` |
+```bash
+# Build & start the service in background on port 8000
+make start
+
+# Run the complete automated test suite in Docker
+make test
+
+# Check container health and status
+make status
+
+# Stream container logs
+make logs
+
+# Stop the service
+make stop
+```
+
+| Target | Description | Underlying Docker Command |
+|---|---|---|
+| `make start` | Build and start container in background | `docker compose up --build -d` |
+| `make test` | Run complete 22-test suite in Docker | `docker compose run --rm loss-experience-api pytest -v` |
+| `make status` | Check container health and port bindings | `docker compose ps` |
+| `make logs` | Stream container logs in real time | `docker compose logs -f` |
+| `make restart` | Stop and restart service | `docker compose down && docker compose up --build -d` |
+| `make stop` | Stop container | `docker compose down` |
+| `make clean` | Stop and remove containers and orphaned volumes | `docker compose down -v --remove-orphans` |
 
 The interactive dashboard is available at: **`http://localhost:8000/`**  
 Interactive API docs (Swagger): **`http://localhost:8000/docs`**
@@ -39,10 +57,11 @@ Interactive API docs (Swagger): **`http://localhost:8000/docs`**
 
 ## 2. Automated Tests & Independent Reconciliation
 
-Run the complete automated test suite inside the container environment with data mounted read-only:
+Run the complete automated test suite inside the container environment:
 ```bash
-docker run --rm -v $(pwd)/data:/app/data:ro envira_test-loss-experience-api pytest -v
+make test
 ```
+*(Or directly with Docker Compose: `docker compose run --rm loss-experience-api pytest -v`)*
 
 The test runner executes:
 1. **API & Logic Tests (`tests/test_loss_experience.py`):** Healthcheck, filtering, sorting, 400 input validations, and web dashboard rendering.
