@@ -56,13 +56,6 @@ The test runner executes:
    - All 60 peril segments.
 
 
-### CI / Pull Request Verification
-A GitHub Actions workflow is defined in `.github/workflows/pr-test.yml` running on pull requests and pushes to `main`.
-- Automatically builds the Docker image and executes `pytest` inside the container.
-- Verifies container startup and checks `/health`.
-- If the repository secret `DATA_ZIP_BASE64` is configured (`base64 -w 0 data.zip`), full 22-test CSV reconciliation runs automatically on every PR.
-- **Merge Protection:** To require passing tests before merging, navigate to **Settings > Branches > Branch protection rules** on GitHub, add a rule for `main`, and check **"Require status checks to pass before merging"** with check `Run Test Suite & Build Verification`.
-
 ---
 
 ## 3. API Endpoints
