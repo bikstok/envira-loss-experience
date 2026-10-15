@@ -9,18 +9,18 @@ from typing import Dict, Tuple
 
 def parse_date_to_iso(date_str: str) -> str:
     """Parse mixed date formats (ISO or European) to canonical ISO 'YYYY-MM-DD'."""
-    clean = date_str.strip()
-    for fmt in ("%Y-%m-%d", "%d-%m-%Y"):
+    cleaned_date_str = date_str.strip()
+    for date_format in ("%Y-%m-%d", "%d-%m-%Y"):
         try:
-            return datetime.strptime(clean, fmt).strftime("%Y-%m-%d")
+            return datetime.strptime(cleaned_date_str, date_format).strftime("%Y-%m-%d")
         except ValueError:
             continue
     raise ValueError(f"Unsupported date format: {date_str}")
 
 
-def init_db(conn: sqlite3.Connection):
+def init_db(connection: sqlite3.Connection):
     """Create normalized relational tables and performance indexes."""
-    cursor = conn.cursor()
+    cursor = connection.cursor()
     cursor.executescript("""
         CREATE TABLE IF NOT EXISTS fx_rates (
             month TEXT NOT NULL,
@@ -75,31 +75,31 @@ def init_db(conn: sqlite3.Connection):
             metric_value INTEGER NOT NULL
         );
     """)
-    conn.commit()
+    connection.commit()
 
 
-def load_csv_data_to_sqlite(conn: sqlite3.Connection, data_dir: str):
+def load_csv_data_to_sqlite(connection: sqlite3.Connection, data_dir: str):
     """Load and normalize raw CSV datasets into SQLite tables."""
-    cursor = conn.cursor()
+    cursor = connection.cursor()
 
     # 1. Load FX Rates
-    fx_path = os.path.join(data_dir, "fx_rates.csv")
+    fx_rates_path = os.path.join(data_dir, "fx_rates.csv")
     fx_rates: Dict[Tuple[str, str], float] = {}
-    with open(fx_path, newline="", encoding="utf-8") as f:
-        reader = csv.DictReader(f)
-        fx_rows = []
-        for r in reader:
-            month = r["month"].strip()
-            curr = r["currency"].strip()
-            rate = float(r["rate_dkk_per_unit"])
-            fx_rates[(month, curr)] = rate
-            fx_rows.append((month, curr, rate))
+    with open(fx_rates_path, newline="", encoding="utf-8") as fx_file:
+        fx_reader = csv.DictReader(fx_file)
+        fx_table_rows = []
+        for row in fx_reader:
+            month = row["month"].strip()
+            currency = row["currency"].strip()
+            exchange_rate = float(row["rate_dkk_per_unit"])
+            fx_rates[(month, currency)] = exchange_rate
+            fx_table_rows.append((month, currency, exchange_rate))
         cursor.executemany(
-            "INSERT OR REPLACE INTO fx_rates VALUES (?, ?, ?)", fx_rows
+            "INSERT OR REPLACE INTO fx_rates VALUES (?, ?, ?)", fx_table_rows
         )
 
     # Helper for FX conversion
-    def get_fx(iso_date: str, currency: str) -> float:
+    def get_exchange_rate(iso_date: str, currency: str) -> float:
         if currency == "DKK":
             return 1.0
         month_key = iso_date[:7]
@@ -110,148 +110,148 @@ def load_csv_data_to_sqlite(conn: sqlite3.Connection, data_dir: str):
 
     # 2. Load Assets
     assets_path = os.path.join(data_dir, "assets.csv")
-    with open(assets_path, newline="", encoding="utf-8") as f:
-        reader = csv.DictReader(f)
-        asset_rows = [
+    with open(assets_path, newline="", encoding="utf-8") as assets_file:
+        assets_reader = csv.DictReader(assets_file)
+        asset_table_rows = [
             (
-                r["asset_id"].strip(),
-                r["portfolio_id"].strip(),
-                r["region"].strip(),
-                r["asset_type"].strip(),
-                int(r["construction_year"]),
-                float(r["sum_insured_dkk"]),
+                row["asset_id"].strip(),
+                row["portfolio_id"].strip(),
+                row["region"].strip(),
+                row["asset_type"].strip(),
+                int(row["construction_year"]),
+                float(row["sum_insured_dkk"]),
             )
-            for r in reader
+            for row in assets_reader
         ]
-        cursor.executemany("INSERT OR REPLACE INTO assets VALUES (?, ?, ?, ?, ?, ?)", asset_rows)
+        cursor.executemany("INSERT OR REPLACE INTO assets VALUES (?, ?, ?, ?, ?, ?)", asset_table_rows)
 
     # 3. Load Policies
     policies_path = os.path.join(data_dir, "policies.csv")
-    policy_ids = set()
+    known_policy_ids = set()
     policy_inceptions: Dict[str, str] = {}
-    non_standard_perils = 0
-    european_dates = 0
+    non_standard_perils_count = 0
+    european_dates_count = 0
 
-    with open(policies_path, newline="", encoding="utf-8") as f:
-        reader = csv.DictReader(f)
-        policy_rows = []
-        for r in reader:
-            raw_peril = r["peril"]
-            norm_peril = raw_peril.strip().lower()
-            if raw_peril != norm_peril:
-                non_standard_perils += 1
+    with open(policies_path, newline="", encoding="utf-8") as policies_file:
+        policies_reader = csv.DictReader(policies_file)
+        policy_table_rows = []
+        for row in policies_reader:
+            raw_peril = row["peril"]
+            normalized_peril = raw_peril.strip().lower()
+            if raw_peril != normalized_peril:
+                non_standard_perils_count += 1
 
-            inc_raw = r["inception_date"].strip()
-            if "-" in inc_raw and inc_raw[2] == "-":
-                european_dates += 1
-            inc_iso = parse_date_to_iso(inc_raw)
+            raw_inception_date = row["inception_date"].strip()
+            if "-" in raw_inception_date and raw_inception_date[2] == "-":
+                european_dates_count += 1
+            iso_inception_date = parse_date_to_iso(raw_inception_date)
 
-            exp_raw = r["expiry_date"].strip()
-            if "-" in exp_raw and exp_raw[2] == "-":
-                european_dates += 1
-            exp_iso = parse_date_to_iso(exp_raw)
+            raw_expiry_date = row["expiry_date"].strip()
+            if "-" in raw_expiry_date and raw_expiry_date[2] == "-":
+                european_dates_count += 1
+            iso_expiry_date = parse_date_to_iso(raw_expiry_date)
 
-            pol_id = r["policy_id"].strip()
-            policy_ids.add(pol_id)
-            policy_inceptions[pol_id] = inc_iso
+            policy_id = row["policy_id"].strip()
+            known_policy_ids.add(policy_id)
+            policy_inceptions[policy_id] = iso_inception_date
 
-            curr = r["currency"].strip()
-            annual_prem = float(r["annual_premium"])
-            fx_rate = get_fx(inc_iso, curr)
-            earned_prem_dkk = annual_prem * fx_rate
-            uw_year = int(inc_iso[:4])
+            currency = row["currency"].strip()
+            annual_premium = float(row["annual_premium"])
+            exchange_rate = get_exchange_rate(iso_inception_date, currency)
+            earned_premium_dkk = annual_premium * exchange_rate
+            underwriting_year = int(iso_inception_date[:4])
 
-            policy_rows.append(
+            policy_table_rows.append(
                 (
-                    pol_id,
-                    r["asset_id"].strip(),
-                    norm_peril,
-                    inc_iso,
-                    exp_iso,
-                    annual_prem,
-                    curr,
-                    uw_year,
-                    earned_prem_dkk,
+                    policy_id,
+                    row["asset_id"].strip(),
+                    normalized_peril,
+                    iso_inception_date,
+                    iso_expiry_date,
+                    annual_premium,
+                    currency,
+                    underwriting_year,
+                    earned_premium_dkk,
                 )
             )
         cursor.executemany(
-            "INSERT OR REPLACE INTO policies VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", policy_rows
+            "INSERT OR REPLACE INTO policies VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", policy_table_rows
         )
 
     # 4. Load Claims
     claims_path = os.path.join(data_dir, "claims.csv")
-    orphaned_claims = 0
-    claims_before_inception = 0
-    negative_paid_claims = 0
+    orphaned_claims_count = 0
+    claims_before_inception_count = 0
+    negative_paid_claims_count = 0
 
-    with open(claims_path, newline="", encoding="utf-8") as f:
-        reader = csv.DictReader(f)
-        claim_rows = []
-        for r in reader:
-            pol_id = r["policy_id"].strip()
-            if pol_id not in policy_ids:
-                orphaned_claims += 1
+    with open(claims_path, newline="", encoding="utf-8") as claims_file:
+        claims_reader = csv.DictReader(claims_file)
+        claim_table_rows = []
+        for row in claims_reader:
+            policy_id = row["policy_id"].strip()
+            if policy_id not in known_policy_ids:
+                orphaned_claims_count += 1
                 continue
 
-            loss_raw = r["loss_date"].strip()
-            if "-" in loss_raw and loss_raw[2] == "-":
-                european_dates += 1
-            loss_iso = parse_date_to_iso(loss_raw)
+            raw_loss_date = row["loss_date"].strip()
+            if "-" in raw_loss_date and raw_loss_date[2] == "-":
+                european_dates_count += 1
+            iso_loss_date = parse_date_to_iso(raw_loss_date)
 
-            rep_raw = r["reported_date"].strip()
-            if "-" in rep_raw and rep_raw[2] == "-":
-                european_dates += 1
-            rep_iso = parse_date_to_iso(rep_raw)
+            raw_reported_date = row["reported_date"].strip()
+            if "-" in raw_reported_date and raw_reported_date[2] == "-":
+                european_dates_count += 1
+            iso_reported_date = parse_date_to_iso(raw_reported_date)
 
-            if loss_iso < policy_inceptions[pol_id]:
-                claims_before_inception += 1
+            if iso_loss_date < policy_inceptions[policy_id]:
+                claims_before_inception_count += 1
 
-            paid = float(r["paid_amount"])
-            res = float(r["reserve_amount"])
-            if paid < 0 or res < 0:
-                negative_paid_claims += 1
+            paid_amount = float(row["paid_amount"])
+            reserve_amount = float(row["reserve_amount"])
+            if paid_amount < 0 or reserve_amount < 0:
+                negative_paid_claims_count += 1
 
-            curr = r["currency"].strip()
-            status = r["status"].strip().lower()
+            currency = row["currency"].strip()
+            claim_status = row["status"].strip().lower()
 
-            if status in ("withdrawn", "declined"):
-                incurred_orig = 0.0
-            elif status == "settled":
-                incurred_orig = paid
-            elif status == "open":
-                incurred_orig = paid + res
+            if claim_status in ("withdrawn", "declined"):
+                incurred_loss_original_currency = 0.0
+            elif claim_status == "settled":
+                incurred_loss_original_currency = paid_amount
+            elif claim_status == "open":
+                incurred_loss_original_currency = paid_amount + reserve_amount
             else:
-                incurred_orig = paid + res
+                incurred_loss_original_currency = paid_amount + reserve_amount
 
-            fx_rate = get_fx(loss_iso, curr)
-            incurred_dkk = incurred_orig * fx_rate
+            exchange_rate = get_exchange_rate(iso_loss_date, currency)
+            incurred_loss_dkk = incurred_loss_original_currency * exchange_rate
 
-            claim_rows.append(
+            claim_table_rows.append(
                 (
-                    r["claim_id"].strip(),
-                    pol_id,
-                    loss_iso,
-                    rep_iso,
-                    paid,
-                    res,
-                    curr,
-                    status,
-                    incurred_dkk,
+                    row["claim_id"].strip(),
+                    policy_id,
+                    iso_loss_date,
+                    iso_reported_date,
+                    paid_amount,
+                    reserve_amount,
+                    currency,
+                    claim_status,
+                    incurred_loss_dkk,
                 )
             )
         cursor.executemany(
-            "INSERT OR REPLACE INTO claims VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", claim_rows
+            "INSERT OR REPLACE INTO claims VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", claim_table_rows
         )
 
     # 5. Record data quality metrics
-    metrics = [
-        ("orphaned_claims_excluded", orphaned_claims),
-        ("claims_loss_before_inception_retained", claims_before_inception),
-        ("negative_paid_claims_retained", negative_paid_claims),
-        ("non_standard_perils_normalized", non_standard_perils),
-        ("european_dates_parsed", european_dates),
+    metrics_records = [
+        ("orphaned_claims_excluded", orphaned_claims_count),
+        ("claims_loss_before_inception_retained", claims_before_inception_count),
+        ("negative_paid_claims_retained", negative_paid_claims_count),
+        ("non_standard_perils_normalized", non_standard_perils_count),
+        ("european_dates_parsed", european_dates_count),
     ]
     cursor.executemany(
-        "INSERT OR REPLACE INTO data_quality_metrics VALUES (?, ?)", metrics
+        "INSERT OR REPLACE INTO data_quality_metrics VALUES (?, ?)", metrics_records
     )
-    conn.commit()
+    connection.commit()

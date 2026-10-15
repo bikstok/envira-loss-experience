@@ -24,7 +24,7 @@ def test_parse_date_iso_and_european():
 
 
 def test_peril_experience_loss_ratio():
-    p = PerilExperience(
+    peril_experience = PerilExperience(
         peril="storm",
         policy_count=10,
         earned_premium=100000.0,
@@ -32,11 +32,11 @@ def test_peril_experience_loss_ratio():
         claim_count=3,
         largest_single_claim=30000.0,
     )
-    p.loss_ratio = p.incurred_loss / p.earned_premium
-    d = p.to_dict()
-    assert d["loss_ratio"] == 0.6
-    assert d["earned_premium"] == 100000.0
-    assert d["incurred_loss"] == 60000.0
+    peril_experience.loss_ratio = peril_experience.incurred_loss / peril_experience.earned_premium
+    peril_dict = peril_experience.to_dict()
+    assert peril_dict["loss_ratio"] == 0.6
+    assert peril_dict["earned_premium"] == 100000.0
+    assert peril_dict["incurred_loss"] == 60000.0
 
 
 def test_repository_loading():
@@ -44,15 +44,15 @@ def test_repository_loading():
     if not os.path.exists(data_dir):
         pytest.skip("Data directory not present")
 
-    repo = LossExperienceRepository(data_dir)
-    dq = repo.get_data_quality_report()
-    assert dq.total_assets == 4200
-    assert dq.total_policies == 11560
-    assert dq.orphaned_claims_excluded == 260
-    assert dq.claims_loss_before_inception == 310
-    assert dq.negative_paid_claims == 262
-    assert len(repo.get_portfolio_ids()) == 12
-    assert repo.total_policies_count == 11560
+    repository = LossExperienceRepository(data_dir)
+    data_quality = repository.get_data_quality_report()
+    assert data_quality.total_assets == 4200
+    assert data_quality.total_policies == 11560
+    assert data_quality.orphaned_claims_excluded == 260
+    assert data_quality.claims_loss_before_inception == 310
+    assert data_quality.negative_paid_claims == 262
+    assert len(repository.get_portfolio_ids()) == 12
+    assert repository.total_policies_count == 11560
 
 
 def test_sqlite_direct_query():
@@ -60,8 +60,8 @@ def test_sqlite_direct_query():
     if not os.path.exists(data_dir):
         pytest.skip("Data directory not present")
 
-    repo = LossExperienceRepository(data_dir)
-    cursor = repo.conn.cursor()
+    repository = LossExperienceRepository(data_dir)
+    cursor = repository.connection.cursor()
     cursor.execute("SELECT COUNT(*) FROM assets")
     assert cursor.fetchone()[0] == 4200
     cursor.execute("SELECT COUNT(*) FROM claims")
@@ -74,20 +74,20 @@ def test_portfolio_experience_calculation():
     if not os.path.exists(data_dir):
         pytest.skip("Data directory not present")
 
-    repo = LossExperienceRepository(data_dir)
-    exp = repo.get_portfolio_experience("PF-01")
-    assert exp is not None
-    assert exp.portfolio_id == "PF-01"
-    assert exp.total_policy_count == 953
-    assert exp.total_claim_count == 337
-    assert exp.total_earned_premium > 0
-    assert exp.total_incurred_loss > 0
-    assert 0 < exp.overall_loss_ratio < 1.0
-    assert "flood" in exp.perils
-    assert "storm" in exp.perils
-    assert "fire" in exp.perils
-    assert "hail" in exp.perils
-    assert "subsidence" in exp.perils
+    repository = LossExperienceRepository(data_dir)
+    portfolio_experience = repository.get_portfolio_experience("PF-01")
+    assert portfolio_experience is not None
+    assert portfolio_experience.portfolio_id == "PF-01"
+    assert portfolio_experience.total_policy_count == 953
+    assert portfolio_experience.total_claim_count == 337
+    assert portfolio_experience.total_earned_premium > 0
+    assert portfolio_experience.total_incurred_loss > 0
+    assert 0 < portfolio_experience.overall_loss_ratio < 1.0
+    assert "flood" in portfolio_experience.perils
+    assert "storm" in portfolio_experience.perils
+    assert "fire" in portfolio_experience.perils
+    assert "hail" in portfolio_experience.perils
+    assert "subsidence" in portfolio_experience.perils
 
 
 def test_portfolio_filtering():
@@ -95,11 +95,11 @@ def test_portfolio_filtering():
     if not os.path.exists(data_dir):
         pytest.skip("Data directory not present")
 
-    repo = LossExperienceRepository(data_dir)
-    all_exp = repo.get_portfolio_experience("PF-01")
-    filtered_exp = repo.get_portfolio_experience("PF-01", underwriting_year=2023)
-    assert filtered_exp is not None
-    assert filtered_exp.total_policy_count < all_exp.total_policy_count
+    repository = LossExperienceRepository(data_dir)
+    all_years_experience = repository.get_portfolio_experience("PF-01")
+    filtered_portfolio_experience = repository.get_portfolio_experience("PF-01", underwriting_year=2023)
+    assert filtered_portfolio_experience is not None
+    assert filtered_portfolio_experience.total_policy_count < all_years_experience.total_policy_count
 
 
 def test_api_endpoints():
@@ -109,66 +109,66 @@ def test_api_endpoints():
 
     with TestClient(app) as client:
         # 1. Health
-        res = client.get("/health")
-        assert res.status_code == 200
-        assert res.json()["status"] == "healthy"
+        health_response = client.get("/health")
+        assert health_response.status_code == 200
+        assert health_response.json()["status"] == "healthy"
 
         # 2. Valid portfolio
-        res = client.get("/portfolios/PF-01/loss-experience")
-        assert res.status_code == 200
-        data = res.json()
-        assert data["portfolio_id"] == "PF-01"
-        assert "perils" in data
-        assert "overall_loss_ratio" in data
-        assert "largest_single_claim" in data
+        portfolio_response = client.get("/portfolios/PF-01/loss-experience")
+        assert portfolio_response.status_code == 200
+        portfolio_data = portfolio_response.json()
+        assert portfolio_data["portfolio_id"] == "PF-01"
+        assert "perils" in portfolio_data
+        assert "overall_loss_ratio" in portfolio_data
+        assert "largest_single_claim" in portfolio_data
 
         # 3. Non-existent portfolio
-        res = client.get("/portfolios/PF-999/loss-experience")
-        assert res.status_code == 404
+        not_found_response = client.get("/portfolios/PF-999/loss-experience")
+        assert not_found_response.status_code == 404
 
         # 4. Filtered portfolio (valid)
-        res = client.get("/portfolios/PF-01/loss-experience?underwriting_year=2023&region=Syddanmark")
-        assert res.status_code == 200
+        filtered_response = client.get("/portfolios/PF-01/loss-experience?underwriting_year=2023&region=Syddanmark")
+        assert filtered_response.status_code == 200
 
         # 4b. Filter validation (invalid inputs -> 400)
-        res_bad_year = client.get("/portfolios/PF-01/loss-experience?underwriting_year=1800")
-        assert res_bad_year.status_code == 400
-        assert "underwriting_year" in res_bad_year.json()["detail"]
+        bad_year_response = client.get("/portfolios/PF-01/loss-experience?underwriting_year=1800")
+        assert bad_year_response.status_code == 400
+        assert "underwriting_year" in bad_year_response.json()["detail"]
 
-        res_bad_region = client.get("/portfolios/PF-01/loss-experience?region=Atlantis")
-        assert res_bad_region.status_code == 400
-        assert "region" in res_bad_region.json()["detail"]
+        bad_region_response = client.get("/portfolios/PF-01/loss-experience?region=Atlantis")
+        assert bad_region_response.status_code == 400
+        assert "region" in bad_region_response.json()["detail"]
 
-        res_bad_type = client.get("/portfolios/PF-01/loss-experience?asset_type=spaceship")
-        assert res_bad_type.status_code == 400
-        assert "asset_type" in res_bad_type.json()["detail"]
+        bad_type_response = client.get("/portfolios/PF-01/loss-experience?asset_type=spaceship")
+        assert bad_type_response.status_code == 400
+        assert "asset_type" in bad_type_response.json()["detail"]
 
         # 5. Compare portfolios (valid)
-        res = client.get("/portfolios/loss-experience?sort_by=loss_ratio&order=desc")
-        assert res.status_code == 200
-        portfolios = res.json()["portfolios"]
+        compare_response = client.get("/portfolios/loss-experience?sort_by=loss_ratio&order=desc")
+        assert compare_response.status_code == 200
+        portfolios = compare_response.json()["portfolios"]
         assert len(portfolios) == 12
         # Verify descending order
-        ratios = [p["overall_loss_ratio"] for p in portfolios]
-        assert ratios == sorted(ratios, reverse=True)
+        loss_ratios = [portfolio["overall_loss_ratio"] for portfolio in portfolios]
+        assert loss_ratios == sorted(loss_ratios, reverse=True)
 
         # 5b. Compare portfolios validation (invalid inputs -> 400)
-        res_bad_sort = client.get("/portfolios/loss-experience?sort_by=random_column")
-        assert res_bad_sort.status_code == 400
-        assert "sort_by" in res_bad_sort.json()["detail"]
+        bad_sort_response = client.get("/portfolios/loss-experience?sort_by=random_column")
+        assert bad_sort_response.status_code == 400
+        assert "sort_by" in bad_sort_response.json()["detail"]
 
-        res_bad_order = client.get("/portfolios/loss-experience?order=backwards")
-        assert res_bad_order.status_code == 400
-        assert "order" in res_bad_order.json()["detail"]
+        bad_order_response = client.get("/portfolios/loss-experience?order=backwards")
+        assert bad_order_response.status_code == 400
+        assert "order" in bad_order_response.json()["detail"]
 
         # 6. Data quality report
-        res = client.get("/data-quality")
-        assert res.status_code == 200
-        dq = res.json()
-        assert dq["quality_adjustments"]["orphaned_claims_excluded"] == 260
+        data_quality_response = client.get("/data-quality")
+        assert data_quality_response.status_code == 200
+        data_quality_data = data_quality_response.json()
+        assert data_quality_data["quality_adjustments"]["orphaned_claims_excluded"] == 260
 
         # 7. Web UI
-        res = client.get("/")
-        assert res.status_code == 200
-        assert "Envira Loss-Experience Reporting" in res.text
+        ui_response = client.get("/")
+        assert ui_response.status_code == 200
+        assert "Envira Loss-Experience Reporting" in ui_response.text
 

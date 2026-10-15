@@ -36,10 +36,10 @@ VALID_SORT_ORDERS: Set[str] = {"asc", "desc"}
 
 def parse_date(date_str: str) -> datetime:
     """Parse mixed date formats (ISO or European) to datetime object."""
-    clean = date_str.strip()
-    for fmt in ("%Y-%m-%d", "%d-%m-%Y"):
+    cleaned_date_str = date_str.strip()
+    for date_format in ("%Y-%m-%d", "%d-%m-%Y"):
         try:
-            return datetime.strptime(clean, fmt)
+            return datetime.strptime(cleaned_date_str, date_format)
         except ValueError:
             continue
     raise ValueError(f"Unsupported date format: {date_str}")
@@ -87,7 +87,10 @@ class PortfolioExperience:
             "overall_loss_ratio": round(self.overall_loss_ratio, 4),
             "total_claim_count": self.total_claim_count,
             "largest_single_claim": round(self.largest_single_claim, 2),
-            "perils": {p: exp.to_dict() for p, exp in sorted(self.perils.items())},
+            "perils": {
+                peril_name: peril_experience.to_dict()
+                for peril_name, peril_experience in sorted(self.perils.items())
+            },
         }
 
 
