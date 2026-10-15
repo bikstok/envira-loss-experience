@@ -41,19 +41,20 @@ docker compose down
 
 ---
 
-## 2. Running Automated Tests & Mathematical Verification
+## 2. Automated Tests & Independent Reconciliation
 
-### Run Automated Tests (pytest)
-Run the test suite inside the container environment with data mounted read-only:
+Run the complete automated test suite inside the container environment with data mounted read-only:
 ```bash
 docker run --rm -v $(pwd)/data:/app/data:ro envira_test-loss-experience-api pytest -v
 ```
 
-### Independent Underwriting Reconciliation Script
-Run the decoupled verification audit comparing raw CSV calculations directly against the SQLite service API down to the cent:
-```bash
-docker run --rm -v $(pwd)/data:/app/data:ro envira_test-loss-experience-api python scripts/verify.py
-```
+The test runner executes:
+1. **API & Logic Tests (`tests/test_loss_experience.py`):** Healthcheck, filtering, sorting, 400 input validations, and web dashboard rendering.
+2. **Independent Reconciliation Tests (`tests/test_reconciliation.py`):** Parametrized independent recalculation directly from raw CSV source files, verifying 0.00 DKK discrepancy across:
+   - Book-level earned premium (`79,771,396.34 DKK`), incurred loss (`55,885,289.98 DKK`), and loss ratio (`70.06%`).
+   - Each individual portfolio (`PF-01` through `PF-12`).
+   - All 60 peril segments.
+
 
 ---
 

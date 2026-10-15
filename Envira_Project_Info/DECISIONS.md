@@ -8,7 +8,7 @@ Stopped: 2026-10-15 14:32 CEST
   - Strict query input validation: returning clear HTTP 400 Bad Request responses with allowable options for invalid sort metrics, orders, regions, asset types, or underwriting years.
   - Data quality audit endpoint (`GET /data-quality`) and an interactive web dashboard (`GET /`) for non-technical underwriters.
   - Ingestion pipeline normalizing 1,321 dirty peril strings (`.strip().lower()`), parsing European and ISO date formats, and applying monthly FX rates.
-  - Independent reconciliation script (`scripts/verify.py`): decoupled verification script independently computing raw totals and verifying 0.00 DKK discrepancy across all 12 portfolios and 60 peril segments.
+  - Independent reconciliation test suite (`tests/test_reconciliation.py`): decoupled mathematical verification independently computing raw totals and asserting 0.00 DKK discrepancy across the whole book, each individual portfolio (`PF-01`–`PF-12`), and all 60 peril segments.
   - Layered separation of concerns: structured codebase across domain models (`src/models.py`), data access repository (`src/repository.py`), input validators (`src/validators.py`), and a slim FastAPI controller (`src/main.py`).
   - Full Docker and Compose configuration with automated healthcheck and pytest suite.
 

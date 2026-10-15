@@ -172,12 +172,3 @@ def test_api_endpoints():
         assert res.status_code == 200
         assert "Envira Loss-Experience Reporting" in res.text
 
-
-def test_independent_mathematical_reconciliation():
-    data_dir = os.getenv("DATA_DIR", "data")
-    if not os.path.exists(data_dir):
-        pytest.skip("Data directory not present")
-
-    from scripts.verify import run_verification
-    assert run_verification(data_dir) is True
-
