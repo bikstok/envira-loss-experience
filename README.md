@@ -20,24 +20,20 @@ Ensure the raw CSV data files are located in the `./data/` directory at the proj
 ```
 *(Note: Per the assessment brief, `./data/` is excluded from git version control via `.gitignore`.)*
 
-### Run with Docker Compose
-Start the service in the background on port `8000`:
-```bash
-docker compose up --build -d
-```
+### Service Control (Makefile / CLI Runner)
+Control the service and test runner with `make` or the bundled `./run` script:
 
-Check status and health:
-```bash
-docker compose ps
-```
+| Action | Makefile | Direct Script | Docker Compose Equivalent |
+|---|---|---|---|
+| **Start Service** | `make start` | `./run start` | `docker compose up --build -d` |
+| **Stop Service** | `make stop` | `./run stop` | `docker compose down` |
+| **Run Tests** | `make test` | `./run test` | `docker compose run --rm loss-experience-api pytest -v` |
+| **Check Status** | `make status` | `./run status` | `docker compose ps` |
+| **Stream Logs** | `make logs` | `./run logs` | `docker compose logs -f` |
+| **Clean Up** | `make clean` | `./run clean` | `docker compose down -v --remove-orphans` |
 
 The interactive dashboard is available at: **`http://localhost:8000/`**  
 Interactive API docs (Swagger): **`http://localhost:8000/docs`**
-
-To stop the service:
-```bash
-docker compose down
-```
 
 ---
 

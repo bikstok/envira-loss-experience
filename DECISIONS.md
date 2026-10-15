@@ -11,6 +11,7 @@ Stopped: 2026-10-15 14:32 CEST
   - Independent reconciliation test suite (`tests/test_reconciliation.py`): decoupled mathematical verification independently computing raw totals and asserting 0.00 DKK discrepancy across the whole book, each individual portfolio (`PF-01`–`PF-12`), and all 60 peril segments.
   - Layered separation of concerns: structured codebase across domain models (`src/models.py`), data access repository (`src/repository.py`), input validators (`src/validators.py`), and a slim FastAPI controller (`src/main.py`).
   - Full Docker and Compose configuration with automated healthcheck and pytest suite.
+  - Developer tooling: `Makefile` and portable `./run` script supporting `start`, `stop`, `restart`, `test`, `status`, `logs`, and `clean`.
 
 - **What I deliberately did not build, and why**
   - External database service (Postgres container / Kafka / Celery): Python's standard library `sqlite3` satisfies the database requirement with zero network latency, zero container sprawl, and instant boot times.
