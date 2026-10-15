@@ -5,43 +5,90 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Envira | Loss Experience Dashboard</title>
     <style>
+        :root {
+            --primary: #0284c7;
+            --primary-hover: #0369a1;
+            --bg: #f8fafc;
+            --card-bg: #ffffff;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            --border: #e2e8f0;
+        }
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background: #f8fafc;
-            color: #0f172a;
+            background: var(--bg);
+            color: var(--text-main);
             margin: 0;
-            padding: 32px;
+            padding: 32px 16px;
         }
         .container {
-            max-width: 1000px;
+            max-width: 1100px;
             margin: 0 auto;
-            background: #ffffff;
+            background: var(--card-bg);
             border-radius: 12px;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
             padding: 32px;
         }
+        header {
+            margin-bottom: 24px;
+        }
         h1 {
-            margin-top: 0;
-            color: #1e293b;
+            margin: 0 0 6px 0;
             font-size: 26px;
+            color: #1e293b;
+        }
+        .subtitle {
+            color: var(--text-muted);
+            margin: 0;
+            font-size: 14px;
+        }
+        .tabs {
             display: flex;
-            align-items: center;
-            gap: 12px;
+            gap: 8px;
+            margin-top: 24px;
+            border-bottom: 2px solid var(--border);
+            padding-bottom: 0;
+        }
+        .tab-btn {
+            background: none;
+            border: none;
+            padding: 10px 18px;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-muted);
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -2px;
+            transition: all 0.15s ease-in-out;
+        }
+        .tab-btn:hover {
+            color: var(--primary);
+        }
+        .tab-btn.active {
+            color: var(--primary);
+            border-bottom-color: var(--primary);
         }
         .controls {
             display: flex;
             flex-wrap: wrap;
-            gap: 16px;
+            gap: 14px;
             align-items: center;
-            margin-bottom: 24px;
+            margin: 24px 0;
             padding: 16px;
             background: #f1f5f9;
             border-radius: 8px;
         }
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
         label {
             font-weight: 600;
-            font-size: 14px;
+            font-size: 12px;
             color: #475569;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
         }
         select, button {
             padding: 8px 12px;
@@ -49,54 +96,20 @@
             border-radius: 6px;
             border: 1px solid #cbd5e1;
             background: white;
+            color: var(--text-main);
         }
-        button {
-            background: #0284c7;
+        button.btn-primary {
+            background: var(--primary);
             color: white;
             border: none;
             cursor: pointer;
             font-weight: 600;
+            align-self: flex-end;
+            padding: 9px 18px;
         }
-        button:hover {
-            background: #0369a1;
+        button.btn-primary:hover {
+            background: var(--primary-hover);
         }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 20px;
-        }
-        th, td {
-            text-align: right;
-            padding: 12px 16px;
-            border-bottom: 1px solid #e2e8f0;
-        }
-        th:first-child, td:first-child {
-            text-align: left;
-        }
-        th {
-            background: #f8fafc;
-            color: #64748b;
-            font-size: 13px;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-        }
-        tr:hover {
-            background: #f8fafc;
-        }
-        .total-row {
-            font-weight: 700;
-            background: #f1f5f9;
-            border-top: 2px solid #cbd5e1;
-        }
-        .badge {
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-weight: 600;
-            font-size: 13px;
-        }
-        .badge-good { background: #dcfce7; color: #166534; }
-        .badge-warning { background: #fef9c3; color: #854d0e; }
-        .badge-bad { background: #fee2e2; color: #991b1b; }
         .meta-card {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
@@ -107,87 +120,228 @@
             padding: 16px;
             background: #f8fafc;
             border-radius: 8px;
-            border: 1px solid #e2e8f0;
+            border: 1px solid var(--border);
         }
-        .metric-label { font-size: 12px; color: #64748b; text-transform: uppercase; }
-        .metric-value { font-size: 20px; font-weight: 700; margin-top: 4px; }
+        .metric-label {
+            font-size: 11px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            font-weight: 600;
+        }
+        .metric-value {
+            font-size: 20px;
+            font-weight: 700;
+            margin-top: 6px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 12px;
+        }
+        th, td {
+            text-align: right;
+            padding: 12px 14px;
+            border-bottom: 1px solid var(--border);
+            font-size: 14px;
+        }
+        th:first-child, td:first-child, th:nth-child(2), td:nth-child(2) {
+            text-align: left;
+        }
+        th {
+            background: #f8fafc;
+            color: var(--text-muted);
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            font-weight: 600;
+        }
+        tr:hover {
+            background: #f8fafc;
+        }
+        .clickable-row {
+            cursor: pointer;
+        }
+        .clickable-row:hover {
+            background: #f0f9ff;
+        }
+        .total-row {
+            font-weight: 700;
+            background: #f1f5f9;
+            border-top: 2px solid #cbd5e1;
+        }
+        .badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-weight: 600;
+            font-size: 12px;
+        }
+        .badge-good { background: #dcfce7; color: #166534; }
+        .badge-warning { background: #fef9c3; color: #854d0e; }
+        .badge-bad { background: #fee2e2; color: #991b1b; }
+        .view-link {
+            color: var(--primary);
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 13px;
+        }
+        .view-link:hover {
+            text-decoration: underline;
+        }
         .footer {
             margin-top: 32px;
+            padding-top: 16px;
+            border-top: 1px solid var(--border);
             font-size: 13px;
-            color: #94a3b8;
+            color: var(--text-muted);
             display: flex;
             justify-content: space-between;
+            align-items: center;
+        }
+        .footer a {
+            color: var(--primary);
+            text-decoration: none;
+        }
+        .footer a:hover {
+            text-decoration: underline;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>Envira Loss-Experience Reporting</h1>
-        <p style="color: #64748b; margin-top: -8px;">Underwriting performance analytics across Danish property portfolios.</p>
+        <header>
+            <h1>Envira Loss-Experience Reporting</h1>
+            <p class="subtitle">Underwriting performance, profitability ranking, and peril breakdowns for Danish climate & property risk.</p>
 
+            <div class="tabs">
+                <button class="tab-btn active" id="tabBtnOverview" onclick="switchTab('overview')">All Portfolios Comparison</button>
+                <button class="tab-btn" id="tabBtnDrilldown" onclick="switchTab('drilldown')">Portfolio Peril Deep-Dive</button>
+            </div>
+        </header>
+
+        <!-- Global Filters -->
         <div class="controls">
-            <label for="portfolioSelect">Portfolio:</label>
-            <select id="portfolioSelect">
-                {{ portfolio_options }}
-            </select>
+            <!-- Portfolio selector (only shown or active for drilldown) -->
+            <div class="control-group" id="portfolioSelectGroup" style="display: none;">
+                <label for="portfolioSelect">Portfolio</label>
+                <select id="portfolioSelect" onchange="fetchDrilldown()">
+                    {{ portfolio_options }}
+                </select>
+            </div>
 
-            <label for="yearFilter">Underwriting Year:</label>
-            <select id="yearFilter">
-                <option value="">All Years</option>
-                <option value="2022">2022</option>
-                <option value="2023">2023</option>
-                <option value="2024">2024</option>
-            </select>
+            <!-- Sort By (only shown for overview) -->
+            <div class="control-group" id="sortGroup">
+                <label for="sortBySelect">Rank By</label>
+                <select id="sortBySelect">
+                    <option value="loss_ratio" selected>Loss Ratio (Worst First)</option>
+                    <option value="incurred_loss">Total Incurred Loss</option>
+                    <option value="earned_premium">Total Earned Premium</option>
+                    <option value="policy_count">Total Policies</option>
+                    <option value="claim_count">Total Claims</option>
+                    <option value="portfolio_id">Portfolio ID</option>
+                </select>
+            </div>
 
-            <label for="regionFilter">Region:</label>
-            <select id="regionFilter">
-                <option value="">All Regions</option>
-                <option value="Hovedstaden">Hovedstaden</option>
-                <option value="Midtjylland">Midtjylland</option>
-                <option value="Nordjylland">Nordjylland</option>
-                <option value="Sjaelland">Sjaelland</option>
-                <option value="Syddanmark">Syddanmark</option>
-            </select>
+            <div class="control-group" id="orderGroup">
+                <label for="orderSelect">Order</label>
+                <select id="orderSelect">
+                    <option value="desc" selected>Descending</option>
+                    <option value="asc">Ascending</option>
+                </select>
+            </div>
 
-            <label for="assetTypeFilter">Asset Type:</label>
-            <select id="assetTypeFilter">
-                <option value="">All Asset Types</option>
-                <option value="agricultural">Agricultural</option>
-                <option value="commercial">Commercial</option>
-                <option value="industrial">Industrial</option>
-                <option value="public">Public</option>
-                <option value="residential">Residential</option>
-            </select>
+            <div class="control-group">
+                <label for="yearFilter">Underwriting Year</label>
+                <select id="yearFilter">
+                    <option value="">All Years</option>
+                    <option value="2022">2022</option>
+                    <option value="2023">2023</option>
+                    <option value="2024">2024</option>
+                </select>
+            </div>
 
-            <button onclick="fetchExperience()">Update View</button>
+            <div class="control-group">
+                <label for="regionFilter">Region</label>
+                <select id="regionFilter">
+                    <option value="">All Regions</option>
+                    <option value="Hovedstaden">Hovedstaden</option>
+                    <option value="Midtjylland">Midtjylland</option>
+                    <option value="Nordjylland">Nordjylland</option>
+                    <option value="Sjaelland">Sjaelland</option>
+                    <option value="Syddanmark">Syddanmark</option>
+                </select>
+            </div>
+
+            <div class="control-group">
+                <label for="assetTypeFilter">Asset Type</label>
+                <select id="assetTypeFilter">
+                    <option value="">All Asset Types</option>
+                    <option value="agricultural">Agricultural</option>
+                    <option value="commercial">Commercial</option>
+                    <option value="industrial">Industrial</option>
+                    <option value="public">Public</option>
+                    <option value="residential">Residential</option>
+                </select>
+            </div>
+
+            <button class="btn-primary" onclick="refreshCurrentTab()">Apply Filters</button>
         </div>
 
+        <!-- Metric KPI Cards -->
         <div class="meta-card" id="summaryCard"></div>
 
-        <table id="experienceTable">
-            <thead>
-                <tr>
-                    <th>Peril</th>
-                    <th>Policies</th>
-                    <th>Claims</th>
-                    <th>Earned Premium</th>
-                    <th>Incurred Loss</th>
-                    <th>Loss Ratio</th>
-                    <th>Largest Claim</th>
-                </tr>
-            </thead>
-            <tbody id="tableBody">
-                <tr><td colspan="7" style="text-align: center; color: #94a3b8;">Loading data...</td></tr>
-            </tbody>
-        </table>
+        <!-- VIEW 1: All Portfolios Overview -->
+        <section id="viewOverview">
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width: 40px;">#</th>
+                        <th>Portfolio</th>
+                        <th>Policies</th>
+                        <th>Claims</th>
+                        <th>Earned Premium</th>
+                        <th>Incurred Loss</th>
+                        <th>Loss Ratio</th>
+                        <th>Largest Claim</th>
+                        <th style="text-align: center;">Action</th>
+                    </tr>
+                </thead>
+                <tbody id="overviewTableBody">
+                    <tr><td colspan="9" style="text-align: center; color: var(--text-muted);">Loading comparison data...</td></tr>
+                </tbody>
+            </table>
+        </section>
+
+        <!-- VIEW 2: Single Portfolio Peril Deep-Dive -->
+        <section id="viewDrilldown" style="display: none;">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Peril</th>
+                        <th>Policies</th>
+                        <th>Claims</th>
+                        <th>Earned Premium</th>
+                        <th>Incurred Loss</th>
+                        <th>Loss Ratio</th>
+                        <th>Largest Claim</th>
+                    </tr>
+                </thead>
+                <tbody id="drilldownTableBody">
+                    <tr><td colspan="7" style="text-align: center; color: var(--text-muted);">Loading peril breakdown...</td></tr>
+                </tbody>
+            </table>
+        </section>
 
         <div class="footer">
-            <span>API Endpoints: <a href="/docs" target="_blank">Swagger Documentation</a> | <a href="/data-quality" target="_blank">Data Quality Report</a></span>
-            <span>All figures in Danish Krone (DKK)</span>
+            <span>Documentation: <a href="/docs" target="_blank">Swagger OpenAPI Docs</a> | <a href="/data-quality" target="_blank">Data Quality & Exclusions Audit</a></span>
+            <span>All monetary figures in Danish Krone (DKK)</span>
         </div>
     </div>
 
     <script>
+        let currentTab = 'overview';
+
         function formatDKK(val) {
             return new Intl.NumberFormat('da-DK', { style: 'currency', currency: 'DKK', maximumFractionDigits: 0 }).format(val);
         }
@@ -197,26 +351,135 @@
             return `<span class="badge ${cls}">${(ratio * 100).toFixed(1)}%</span>`;
         }
 
-        async function fetchExperience() {
-            const portfolio = document.getElementById('portfolioSelect').value;
+        function getFilterQuery() {
             const year = document.getElementById('yearFilter').value;
             const region = document.getElementById('regionFilter').value;
             const assetType = document.getElementById('assetTypeFilter').value;
 
-            let url = `/portfolios/${portfolio}/loss-experience?`;
-            if (year) url += `underwriting_year=${year}&`;
-            if (region) url += `region=${encodeURIComponent(region)}&`;
-            if (assetType) url += `asset_type=${encodeURIComponent(assetType)}&`;
+            let query = '';
+            if (year) query += `&underwriting_year=${year}`;
+            if (region) query += `&region=${encodeURIComponent(region)}`;
+            if (assetType) query += `&asset_type=${encodeURIComponent(assetType)}`;
+            return query;
+        }
+
+        function switchTab(tab) {
+            currentTab = tab;
+            const isOverview = tab === 'overview';
+
+            document.getElementById('tabBtnOverview').classList.toggle('active', isOverview);
+            document.getElementById('tabBtnDrilldown').classList.toggle('active', !isOverview);
+
+            document.getElementById('viewOverview').style.display = isOverview ? 'block' : 'none';
+            document.getElementById('viewDrilldown').style.display = isOverview ? 'none' : 'block';
+
+            document.getElementById('sortGroup').style.display = isOverview ? 'flex' : 'none';
+            document.getElementById('orderGroup').style.display = isOverview ? 'flex' : 'none';
+            document.getElementById('portfolioSelectGroup').style.display = isOverview ? 'none' : 'flex';
+
+            refreshCurrentTab();
+        }
+
+        function refreshCurrentTab() {
+            if (currentTab === 'overview') {
+                fetchOverview();
+            } else {
+                fetchDrilldown();
+            }
+        }
+
+        async function fetchOverview() {
+            const sortBy = document.getElementById('sortBySelect').value;
+            const order = document.getElementById('orderSelect').value;
+            const url = `/portfolios/loss-experience?sort_by=${sortBy}&order=${order}${getFilterQuery()}`;
 
             try {
                 const res = await fetch(url);
-                if (!res.ok) throw new Error('Failed to load portfolio data');
+                if (!res.ok) throw new Error((await res.json()).detail || 'Failed to load portfolio ranking');
                 const data = await res.json();
 
-                // Summary boxes
+                const totalPrem = data.portfolios.reduce((s, p) => s + p.total_earned_premium_dkk, 0);
+                const totalLoss = data.portfolios.reduce((s, p) => s + p.total_incurred_loss_dkk, 0);
+                const totalPol = data.portfolios.reduce((s, p) => s + p.total_policy_count, 0);
+                const totalClm = data.portfolios.reduce((s, p) => s + p.total_claim_count, 0);
+                const overallRatio = totalPrem > 0 ? (totalLoss / totalPrem) : 0;
+
+                // Render Summary KPI Cards
                 document.getElementById('summaryCard').innerHTML = `
                     <div class="metric-box">
-                        <div class="metric-label">Overall Loss Ratio</div>
+                        <div class="metric-label">Book Loss Ratio</div>
+                        <div class="metric-value">${getLossBadge(overallRatio)}</div>
+                    </div>
+                    <div class="metric-box">
+                        <div class="metric-label">Total Earned Premium</div>
+                        <div class="metric-value">${formatDKK(totalPrem)}</div>
+                    </div>
+                    <div class="metric-box">
+                        <div class="metric-label">Total Incurred Loss</div>
+                        <div class="metric-value">${formatDKK(totalLoss)}</div>
+                    </div>
+                    <div class="metric-box">
+                        <div class="metric-label">Active Portfolios</div>
+                        <div class="metric-value">${data.portfolios_count}</div>
+                    </div>
+                `;
+
+                // Render Overview Table
+                let rows = '';
+                data.portfolios.forEach((p, idx) => {
+                    rows += `
+                        <tr class="clickable-row" onclick="drillInto('${p.portfolio_id}')">
+                            <td style="color: var(--text-muted); font-weight: 600;">${idx + 1}</td>
+                            <td><strong>${p.portfolio_id}</strong></td>
+                            <td>${p.total_policy_count.toLocaleString()}</td>
+                            <td>${p.total_claim_count.toLocaleString()}</td>
+                            <td>${formatDKK(p.total_earned_premium_dkk)}</td>
+                            <td>${formatDKK(p.total_incurred_loss_dkk)}</td>
+                            <td>${getLossBadge(p.overall_loss_ratio)}</td>
+                            <td>${formatDKK(p.largest_single_claim_dkk)}</td>
+                            <td style="text-align: center;"><a class="view-link" href="javascript:void(0)">View Perils →</a></td>
+                        </tr>
+                    `;
+                });
+
+                rows += `
+                    <tr class="total-row">
+                        <td></td>
+                        <td>Total Book</td>
+                        <td>${totalPol.toLocaleString()}</td>
+                        <td>${totalClm.toLocaleString()}</td>
+                        <td>${formatDKK(totalPrem)}</td>
+                        <td>${formatDKK(totalLoss)}</td>
+                        <td>${getLossBadge(overallRatio)}</td>
+                        <td>-</td>
+                        <td></td>
+                    </tr>
+                `;
+
+                document.getElementById('overviewTableBody').innerHTML = rows;
+            } catch (err) {
+                document.getElementById('overviewTableBody').innerHTML = `<tr><td colspan="9" style="color: red; text-align: center;">Error: ${err.message}</td></tr>`;
+            }
+        }
+
+        function drillInto(portfolioId) {
+            document.getElementById('portfolioSelect').value = portfolioId;
+            switchTab('drilldown');
+        }
+
+        async function fetchDrilldown() {
+            const portfolio = document.getElementById('portfolioSelect').value;
+            const url = `/portfolios/${portfolio}/loss-experience?${getFilterQuery().substring(1)}`;
+
+            try {
+                const res = await fetch(url);
+                if (!res.ok) throw new Error((await res.json()).detail || 'Failed to load portfolio details');
+                const data = await res.json();
+
+                // Render KPI cards for selected portfolio
+                document.getElementById('summaryCard').innerHTML = `
+                    <div class="metric-box">
+                        <div class="metric-label">${data.portfolio_id} Loss Ratio</div>
                         <div class="metric-value">${getLossBadge(data.overall_loss_ratio)}</div>
                     </div>
                     <div class="metric-box">
@@ -233,9 +496,10 @@
                     </div>
                 `;
 
-                let rowsHtml = '';
+                // Render Peril table
+                let rows = '';
                 for (const [peril, exp] of Object.entries(data.perils)) {
-                    rowsHtml += `
+                    rows += `
                         <tr>
                             <td><strong>${peril.charAt(0).toUpperCase() + peril.slice(1)}</strong></td>
                             <td>${exp.policy_count.toLocaleString()}</td>
@@ -248,7 +512,7 @@
                     `;
                 }
 
-                rowsHtml += `
+                rows += `
                     <tr class="total-row">
                         <td>Total</td>
                         <td>${data.total_policy_count.toLocaleString()}</td>
@@ -260,14 +524,13 @@
                     </tr>
                 `;
 
-                document.getElementById('tableBody').innerHTML = rowsHtml;
+                document.getElementById('drilldownTableBody').innerHTML = rows;
             } catch (err) {
-                document.getElementById('tableBody').innerHTML = `<tr><td colspan="7" style="color: red; text-align: center;">Error loading data: ${err.message}</td></tr>`;
+                document.getElementById('drilldownTableBody').innerHTML = `<tr><td colspan="7" style="color: red; text-align: center;">Error: ${err.message}</td></tr>`;
             }
         }
 
-        // Initial load
-        window.onload = fetchExperience;
+        window.onload = () => switchTab('overview');
     </script>
 </body>
 </html>
